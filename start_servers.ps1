@@ -19,6 +19,28 @@ if (-not $isAdmin) {
     Write-Host "[!] NOT running as Administrator - binding to port $bridgePort will likely fail."
 }
 
+# ── Read bridge_config.json if present (overrides env) ──
+$configFile = Join-Path $root "bridge_config.json"
+if (Test-Path $configFile) {
+    try {
+        $cfg = Get-Content $configFile -Raw | ConvertFrom-Json
+        if ($cfg.data_source -eq "rithmic") {
+            $env:RITHMIC_MODE = "1"
+            $env:RITHMIC_USER   = $cfg.rithmic.user
+            $env:RITHMIC_PASSWORD = $cfg.rithmic.password
+            if ($cfg.rithmic.system) { $env:RITHMIC_SYSTEM = $cfg.rithmic.system }
+            if ($cfg.rithmic.url)    { $env:RITHMIC_URL    = $cfg.rithmic.url }
+            Write-Host "[*] bridge_config.json: data_source=rithmic"
+        } else {
+            $env:RITHMIC_MODE = ""
+            Write-Host "[*] bridge_config.json: data_source=cqg"
+        }
+    } catch { Write-Host "[!] Could not read bridge_config.json: $_" }
+} elseif ($env:RITHMIC_USER) {
+    $env:RITHMIC_MODE = "1"
+    Write-Host "[*] RITHMIC_MODE=1 detected (RITHMIC_USER env var set)"
+}
+
 # ── Kill any existing processes ──
 Write-Host "[*] Killing existing bridge_mitm_proxy / vol_hist_server / Deepchart / VolumetricaBridge processes ..."
 Get-CimInstance Win32_Process -Filter "Name = 'python.exe' OR Name = 'python3.exe'" |

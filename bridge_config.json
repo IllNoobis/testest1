@@ -1,0 +1,42 @@
+{
+    "_comment": "Bridge Configuration — edit this file to set your data source and credentials.",
+    "_comment_data_source": "'rithmic' or 'cqg'. CQG uses the free AMP demo by default, no account needed.",
+    "data_source": "cqg",
+
+    "rithmic": {
+        "_comment_user": "Your Rithmic trial username (email)",
+        "user": "",
+        "_comment_password": "Your Rithmic trial password",
+        "password": "",
+        "_comment_system": "System name — usually RithmicPaperTradingChicago",
+        "system": "RithmicPaperTradingChicago",
+        "_comment_url": "Gateway URL — rituz00100.rithmic.com:443 for test",
+        "url": "rituz00100.rithmic.com:443"
+    },
+
+    "cqg": {
+        "_comment_user": "CQG demo user (free, no account needed)",
+        "user": "demo87820",
+        "_comment_password": "CQG demo password",
+        "password": "AMPDemo1"
+    },
+
+    "license": {
+        "_comment_server_url": "Your license server URL. Leave empty to skip license check.",
+        "server_url": ""
+    },
+
+    "bridge": {
+        "_comment_port": "Port the bridge listens on (default 443)",
+        "port": 443,
+        "_comment_bind_host": "Interface to bind (0.0.0.0 = all)",
+        "bind_host": "0.0.0.0"
+    },
+
+    "cqg_server_override": {
+        "_comment": "Only needed if CQG changes their server. Leave as-is.",
+        "host": "208.48.16.22",
+        "port": 443,
+        "sni": "demoapi.cqg.com"
+    }
+}

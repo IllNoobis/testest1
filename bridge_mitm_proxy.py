@@ -4,6 +4,7 @@ Bridge MITM Proxy — intercepts VolumetricaBridge ↔ CQG WebAPI WebSocket.
 Patches logon credentials and logs every protobuf message in both directions.
 """
 # made by illnoobis
+import config_loader; config_loader.load()
 import asyncio
 import ssl
 import sys
