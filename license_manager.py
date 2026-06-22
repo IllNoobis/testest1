@@ -8,6 +8,7 @@ See compile_license.py in this directory.
 
 import hashlib
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -22,7 +23,7 @@ except ImportError:
     requests = None  # Will fail gracefully with a message
 
 LICENSE_FILE = Path(__file__).parent / ".license"
-SERVER_URL = "http://localhost:9876"  # CHANGE THIS to your server URL
+SERVER_URL = os.environ.get("LICENSE_SERVER_URL", "http://localhost:9876")
 
 CHECK_INTERVAL = 3600  # Re-check every hour while bridge runs
 

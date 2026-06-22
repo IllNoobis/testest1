@@ -1,15 +1,15 @@
 {
     "_comment": "Bridge Configuration — edit this file to set your data source and credentials.",
     "_comment_data_source": "'rithmic' or 'cqg'. CQG uses the free AMP demo by default, no account needed.",
-    "data_source": "cqg",
+    "data_source": "rithmic",
 
     "rithmic": {
         "_comment_user": "Your Rithmic trial username (email)",
-        "user": "",
+        "user": "zsfxr34497@minitts.net",
         "_comment_password": "Your Rithmic trial password",
-        "password": "",
-        "_comment_system": "System name — usually RithmicPaperTradingChicago",
-        "system": "RithmicPaperTradingChicago",
+        "password": "12345678@@A",
+        "_comment_system": "System name — Rithmic Paper Trading Chicago",
+        "system": "Rithmic Paper Trading Chicago",
         "_comment_url": "Gateway URL — rituz00100.rithmic.com:443 for test",
         "url": "rituz00100.rithmic.com:443"
     },
@@ -23,7 +23,7 @@
 
     "license": {
         "_comment_server_url": "Your license server URL. Leave empty to skip license check.",
-        "server_url": ""
+        "server_url": "http://localhost:9876"
     },
 
     "bridge": {

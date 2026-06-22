@@ -28,7 +28,7 @@ def load():
                          ("system", "RITHMIC_SYSTEM"), ("url", "RITHMIC_URL")]:
             if r.get(key):
                 os.environ[env] = r[key]
-        os.environ.setdefault("RITHMIC_SYSTEM", "RithmicPaperTradingChicago")
+        os.environ.setdefault("RITHMIC_SYSTEM", "Rithmic Paper Trading Chicago")
         os.environ.setdefault("RITHMIC_URL", "rituz00100.rithmic.com:443")
     elif source == "cqg":
         os.environ.pop("RITHMIC_MODE", None)

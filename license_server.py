@@ -38,7 +38,8 @@ def _init_db():
             created_at TEXT NOT NULL,
             expires_at TEXT NOT NULL,
             active INTEGER DEFAULT 1,
-            last_checkin TEXT
+            last_checkin TEXT,
+            note TEXT DEFAULT ''
         )
     """)
     conn.commit()

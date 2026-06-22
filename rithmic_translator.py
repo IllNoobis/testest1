@@ -100,10 +100,22 @@ class RithmicTranslator:
         import os
         self.rithmic_user = os.environ.get("RITHMIC_USER", "")
         self.rithmic_pass = os.environ.get("RITHMIC_PASSWORD", "")
-        self.rithmic_system = os.environ.get("RITHMIC_SYSTEM", "Rithmic Paper Chicago")
+        self.rithmic_system = os.environ.get("RITHMIC_SYSTEM", "Rithmic Paper Trading Chicago")
         self.rithmic_url = os.environ.get("RITHMIC_URL", "rituz00100.rithmic.com:443")
         self.app_name = os.environ.get("RITHMIC_APP_NAME", "DeepChartBridge")
         self.app_ver = os.environ.get("RITHMIC_APP_VER", "1.0")
+
+    def set_credentials(self, user: str, password: str, system: str = None, url: str = None):
+        """Override credentials from a CQG logon message."""
+        if user:
+            self.rithmic_user = user
+        if password:
+            self.rithmic_pass = password
+        if system:
+            self.rithmic_system = system
+        if url:
+            self.rithmic_url = url
+        log.info(f"[RTHM] Credentials set: user={self.rithmic_user} system={self.rithmic_system} url={self.rithmic_url}")
 
     async def connect_rithmic(self):
         """Connect to Rithmic Protocol API."""

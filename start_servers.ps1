@@ -5,7 +5,6 @@ $volHistPort   = if ($env:VOL_HIST_PORT)       { $env:VOL_HIST_PORT }       else
 $bridgePort    = if ($env:BRIDGE_PROXY_PORT)    { $env:BRIDGE_PROXY_PORT }   else { 443 }
 $histScript    = if ($env:VOL_HIST_SCRIPT)      { $env:VOL_HIST_SCRIPT }     else { Join-Path $root 'vol_hist_server.py' }
 $bridgeScript  = if ($env:BRIDGE_SCRIPT)        { $env:BRIDGE_SCRIPT }       else { Join-Path $root 'bridge_mitm_proxy.py' }
-$pythonExe     = if ($env:PYTHON_EXE)           { $env:PYTHON_EXE }          elseif ($env:RITHMIC_MODE) { 'C:\Users\erand.bazaj\AppData\Local\Programs\Python\Python313\python.exe' } else { 'python' }
 $bridgeProc    = if ($env:BRIDGE_PROCESS_NAME)  { $env:BRIDGE_PROCESS_NAME } else { 'VolumetricaBridge' }
 
 # Hardcoded paths to patched executables
@@ -19,7 +18,7 @@ if (-not $isAdmin) {
     Write-Host "[!] NOT running as Administrator - binding to port $bridgePort will likely fail."
 }
 
-# ── Read bridge_config.json if present (overrides env) ──
+#  Read bridge_config.json if present (overrides env) 
 $configFile = Join-Path $root "bridge_config.json"
 if (Test-Path $configFile) {
     try {
@@ -41,7 +40,40 @@ if (Test-Path $configFile) {
     Write-Host "[*] RITHMIC_MODE=1 detected (RITHMIC_USER env var set)"
 }
 
-# ── Kill any existing processes ──
+# Pick Python executable  determined AFTER config sets RITHMIC_MODE
+if ($env:PYTHON_EXE) {
+    $pythonExe = $env:PYTHON_EXE
+} elseif ($env:RITHMIC_MODE) {
+    $pythonExe = 'C:\Users\erand.bazaj\AppData\Local\Programs\Python\Python313\python.exe'
+} else {
+    $pythonExe = 'python'
+}
+
+#  License check
+if ($cfg -and $cfg.license.server_url) {
+    $env:LICENSE_SERVER_URL = $cfg.license.server_url
+    Write-Host "[*] License server: $env:LICENSE_SERVER_URL"
+    Write-Host "[*] Running license check..."
+    $licenseResult = & $pythonExe "$root\license_check.py" 2>&1
+    foreach ($line in $licenseResult) { Write-Host "  $line" }
+    $licenseOk = $LASTEXITCODE -eq 0
+    if (-not $licenseOk) {
+        Write-Host "[!] No valid license - launching login window..."
+        $loginResult = & $pythonExe "$root\license_login.py" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[!] License activation cancelled or failed - exiting."
+            $loginResult | ForEach-Object { Write-Host "  $_" }
+            exit 1
+        }
+        Write-Host "[+] License activated successfully."
+    } else {
+        Write-Host "[+] License check passed."
+    }
+} else {
+    Write-Host "[*] No license server configured - skipping license check."
+}
+
+#  Kill any existing processes 
 Write-Host "[*] Killing existing bridge_mitm_proxy / vol_hist_server / Deepchart / VolumetricaBridge processes ..."
 Get-CimInstance Win32_Process -Filter "Name = 'python.exe' OR Name = 'python3.exe'" |
   Where-Object { $_.CommandLine -match "bridge_mitm_proxy|vol_hist_server" } |
@@ -58,7 +90,7 @@ foreach ($name in @('Deepchart', 'VolumetricaBridge')) {
 }
 Start-Sleep -Seconds 2
 
-# ── Check ports ──
+#  Check ports 
 $histPortCheck = Get-NetTCPConnection -LocalPort $volHistPort -ErrorAction SilentlyContinue
 if ($histPortCheck) {
     $p = Get-Process -Id $histPortCheck.OwningProcess -ErrorAction SilentlyContinue
@@ -90,7 +122,7 @@ if ($bridgePortCheck) {
     }
 }
 
-# ── Start Volumetrica Historical Server ──
+#  Start Volumetrica Historical Server 
 Write-Host ""
 Write-Host "Starting Volumetrica Historical Server (port $volHistPort)..."
 $hist = Start-Process -WindowStyle Normal -PassThru -FilePath $pythonExe -ArgumentList "`"$histScript`""
@@ -106,23 +138,28 @@ if ($histOk) {
     Write-Host "[!] Volumetrica Historical Server did NOT bind to port $volHistPort"
 }
 
-# ── Start Bridge MITM Proxy ──
-Write-Host ""
-Write-Host "Starting Bridge MITM Proxy (port $bridgePort)..."
-$bridge = Start-Process -WindowStyle Normal -PassThru -FilePath $pythonExe -ArgumentList "`"$bridgeScript`""
-Start-Sleep -Seconds 3
-
-$bridgeCheck = Get-NetTCPConnection -LocalPort $bridgePort -ErrorAction SilentlyContinue
-$bridgeOk = $bridgeCheck -and $bridgeCheck.OwningProcess -eq $bridge.Id
-if ($bridgeOk) {
-    Write-Host "[+] Bridge MITM Proxy running (PID $($bridge.Id) on port $bridgePort)"
-} elseif ($bridgeCheck) {
-    Write-Host "[!] Port $bridgePort is open but owned by PID $($bridgeCheck.OwningProcess) (not our PID $($bridge.Id))"
+#  Start Bridge MITM Proxy 
+if ($env:RITHMIC_MODE) {
+    Write-Host "[*] Skipping Bridge MITM Proxy in Rithmic mode (native Rithmic connects directly)"
+    $bridgeOk = $false
 } else {
-    Write-Host "[!] Bridge MITM Proxy did NOT bind to port $bridgePort"
+    Write-Host ""
+    Write-Host "Starting Bridge MITM Proxy (port $bridgePort)..."
+    $bridge = Start-Process -WindowStyle Normal -PassThru -FilePath $pythonExe -ArgumentList "`"$bridgeScript`""
+    Start-Sleep -Seconds 3
+
+    $bridgeCheck = Get-NetTCPConnection -LocalPort $bridgePort -ErrorAction SilentlyContinue
+    $bridgeOk = $bridgeCheck -and $bridgeCheck.OwningProcess -eq $bridge.Id
+    if ($bridgeOk) {
+        Write-Host "[+] Bridge MITM Proxy running (PID $($bridge.Id) on port $bridgePort)"
+    } elseif ($bridgeCheck) {
+        Write-Host "[!] Port $bridgePort is open but owned by PID $($bridgeCheck.OwningProcess) (not our PID $($bridge.Id))"
+    } else {
+        Write-Host "[!] Bridge MITM Proxy did NOT bind to port $bridgePort"
+    }
 }
 
-# ── Launch VolumetricaBridge ──
+#  Launch VolumetricaBridge 
 Write-Host ""
 Write-Host "Launching VolumetricaBridge..."
 $vbridgeDir = Split-Path -Parent $vbridgeExe
@@ -134,7 +171,7 @@ if (Test-Path $vbridgeExe) {
 }
 Start-Sleep -Seconds 4
 
-# ── Launch Deepchart ──
+#  Launch Deepchart 
 Write-Host ""
 Write-Host "Launching Deepchart..."
 if (Test-Path $deepchartExe) {
@@ -145,7 +182,7 @@ if (Test-Path $deepchartExe) {
     Write-Host "[!] Deepchart.exe not found at: $deepchartExe"
 }
 
-# ── Summary ──
+#  Summary 
 Write-Host ""
 Write-Host "=============================="
 if ($histOk) { Write-Host "  VOL HIST : RUNNING ($volHistPort)" } else { Write-Host "  VOL HIST : NOT RUNNING" }
@@ -159,3 +196,4 @@ Write-Host ""
 if (-not $isAdmin) { Write-Host "[TIP] Run as Administrator to avoid port-binding issues." }
 Write-Host ""
 Write-Host "Close each server window to stop it."
+
