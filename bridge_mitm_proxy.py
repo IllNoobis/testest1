@@ -51,23 +51,36 @@ CERT     = config.CERT
 KEY      = config.KEY_ENV
 os.makedirs(config.LOG_DIR, exist_ok=True)
 LOGFILE  = os.path.join(config.LOG_DIR, f"bridge_mitm_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.log")
+RTHMLOG = os.path.join(config.LOG_DIR, f"rithmic_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.log")
 
 # ─── Logging ───────────────────────────────────────────────────────────────────
 log_level = getattr(logging, config.LOG_LEVEL.upper(), logging.DEBUG)
-_file_handler   = logging.FileHandler(LOGFILE, encoding="utf-8")
-_file_handler.setLevel(logging.DEBUG)
-_stream_handler = logging.StreamHandler(sys.stdout)
-_stream_handler.setLevel(logging.INFO)
 
-_fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-_file_handler.setFormatter(_fmt)
-_stream_handler.setFormatter(_fmt)
+_fmt = logging.Formatter("%(asctime)s [%(name)s] [%(levelname)s] %(message)s")
+
+_main_file   = logging.FileHandler(LOGFILE, encoding="utf-8")
+_main_file.setLevel(logging.DEBUG)
+_main_file.setFormatter(_fmt)
+
+_rthm_file   = logging.FileHandler(RTHMLOG, encoding="utf-8")
+_rthm_file.setLevel(logging.DEBUG)
+_rthm_file.setFormatter(_fmt)
+
+_stream = logging.StreamHandler(sys.stdout)
+_stream.setLevel(logging.INFO)
+_stream.setFormatter(_fmt)
+
+# Root logger catches everything (including rithmic-xlate, bridge-mitm, etc.)
+root = logging.getLogger()
+root.setLevel(log_level)
+root.addHandler(_main_file)
+root.addHandler(_stream)
+
+# Dedicated Rithmic file handler on root so Rithmic traces land in their own file too
+root.addHandler(_rthm_file)
 
 log = logging.getLogger("bridge-mitm")
-log.setLevel(log_level)
-log.addHandler(_file_handler)
-log.addHandler(_stream_handler)
-log.propagate = False
+log.propagate = True  # let root handle it
 
 # ─── Protobuf imports ──────────────────────────────────────────────────────────
 _script_dir = os.path.dirname(os.path.abspath(__file__))
