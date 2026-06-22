@@ -122,6 +122,12 @@ class RithmicTranslator:
             url=self.rithmic_url,
         )
 
+        import ssl
+        permissive_ctx = ssl.create_default_context()
+        permissive_ctx.check_hostname = False
+        permissive_ctx.verify_mode = ssl.CERT_NONE
+        self.rithmic.ssl_context = permissive_ctx
+
         self.rithmic.on_connected += lambda p: log.info(f"[RTHM] {p} connected")
         self.rithmic.on_disconnected += lambda p: log.warning(f"[RTHM] {p} disconnected")
         self.rithmic.on_tick += self._on_tick

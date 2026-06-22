@@ -5,7 +5,7 @@ $volHistPort   = if ($env:VOL_HIST_PORT)       { $env:VOL_HIST_PORT }       else
 $bridgePort    = if ($env:BRIDGE_PROXY_PORT)    { $env:BRIDGE_PROXY_PORT }   else { 443 }
 $histScript    = if ($env:VOL_HIST_SCRIPT)      { $env:VOL_HIST_SCRIPT }     else { Join-Path $root 'vol_hist_server.py' }
 $bridgeScript  = if ($env:BRIDGE_SCRIPT)        { $env:BRIDGE_SCRIPT }       else { Join-Path $root 'bridge_mitm_proxy.py' }
-$pythonExe     = if ($env:PYTHON_EXE)           { $env:PYTHON_EXE }          elseif ($env:RITHMIC_MODE) { 'C:\Users\erand.bazaj\AppData\Local\Programs\Python\Python313\python.exe' } else { 'python' }
+$pythonExe     = if ($env:PYTHON_EXE)           { $env:PYTHON_EXE }          elseif ($env:RITHMIC_MODE) { Join-Path $root '.venv311\Scripts\python.exe' } else { 'python' }
 $bridgeProc    = if ($env:BRIDGE_PROCESS_NAME)  { $env:BRIDGE_PROCESS_NAME } else { 'VolumetricaBridge' }
 
 # Hardcoded paths to patched executables

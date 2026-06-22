@@ -23,7 +23,6 @@ $entries = @(
     "$ip api.cqg.com"
     "$ip depth-it.historical.deepcharts.com"
     "$ip data-b.historical.deepcharts.com"
-    "$ip rituz00100.rithmic.com"
 )
 $hostsPath = Join-Path $env:SYSTEMROOT 'System32\drivers\etc\hosts'
 $lines = @(Get-Content $hostsPath -Encoding ASCII)

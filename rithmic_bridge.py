@@ -114,6 +114,12 @@ class RithmicDataBridge:
             url=RITHMIC_URL,
         )
 
+        import ssl
+        permissive_ctx = ssl.create_default_context()
+        permissive_ctx.check_hostname = False
+        permissive_ctx.verify_mode = ssl.CERT_NONE
+        self.client.ssl_context = permissive_ctx
+
         self.client.on_connected += lambda plant: log.info(f"[{plant}] Connected")
         self.client.on_disconnected += lambda plant: log.warning(f"[{plant}] Disconnected")
 
