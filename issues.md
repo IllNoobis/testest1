@@ -12,6 +12,12 @@
 
 5. **Port 443 in use by `svchost/Appinfo` (IP Helper)** — Requires Administrator privileges to free. Script now detects this and reports it.
 
+6. **SSL certificate verification failure when connecting to Rithmic** — `async_rithmic` rejects the MITM proxy's self-signed cert when hosts file redirects Rithmic traffic. Fixed by setting a permissive SSL context (`CERT_NONE`) on the `RithmicClient` in both `rithmic_translator.py` and `rithmic_bridge.py`.
+
+7. **toggle-proxy-hosts.ps1 redirected Rithmic traffic to localhost** — The `rituz00100.rithmic.com` hosts entry caused the Rithmic client to connect to the proxy instead of the real server. Fixed by removing the entry and adding cleanup logic for stale rithmic entries.
+
+8. **README.md contained informal/unclear content** — Rewrote to be professional, focused on Rithmic setup, with clear prerequisites and steps.
+
 ## Unfixed / Known Issues
 
 1. **Port 443 requires Administrator** — `start_servers.ps1` cannot bind to port 443 without admin rights because `iphlpsvc` (IP Helper) holds it. Must run as Administrator or run `net stop iphlpsvc` manually.
@@ -49,3 +55,7 @@
 17. **Duplicated Rithmic connection logic** — `rithmic_translator.py` and `rithmic_bridge.py` both implement Rithmic connection/credential handling independently. Should share a common layer.
 
 18. **Global mutable protobuf state** — `_load_protobufs` mutates module-level globals. Multiple instances with different paths silently overwrite each other.
+
+19. **Rithmic `DecodeError: Error parsing message`** — After SSL fix, `async_rithmic` connects to Rithmic but `get_system_info()` fails with protobuf decode error. Possible causes: wrong gateway URL, wrong system name, or credentials issue. Verbose debug logging added to capture raw bytes on failure.
+
+20. **Rithmic intercept proxy needed** — To debug the DecodeError and understand the working protocol, need to capture MotiveWave's Rithmic traffic. `rithmic_intercept_proxy.py` created but not yet tested.
