@@ -107,6 +107,7 @@ class RithmicTranslator:
 
     async def connect_rithmic(self):
         """Connect to Rithmic Protocol API."""
+        import ssl
         from async_rithmic import RithmicClient
 
         if not self.rithmic_user or not self.rithmic_pass:
@@ -122,17 +123,36 @@ class RithmicTranslator:
             url=self.rithmic_url,
         )
 
+        # Override SSL to be permissive (hosts file redirects to localhost)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        self.rithmic.ssl_context = ctx
+
         self.rithmic.on_connected += lambda p: log.info(f"[RTHM] {p} connected")
         self.rithmic.on_disconnected += lambda p: log.warning(f"[RTHM] {p} disconnected")
         self.rithmic.on_tick += self._on_tick
 
+        # Verbose debug: dump all plants after connection
+        async def _on_connect_debug(plant_name):
+            plant = self.rithmic.plants.get(plant_name)
+            if plant:
+                log.debug(f"[RTHM] {plant_name} plant: connected={plant.is_connected}")
+        self.rithmic.on_connected += _on_connect_debug
+
         try:
+            log.info(f"[RTHM] Connecting to {self.rithmic_url} (user={self.rithmic_user}, system={self.rithmic_system})")
             await self.rithmic.connect()
             self.connected = True
             log.info("[RTHM] Connected to Rithmic")
             return True
+        except ssl.SSLCertVerificationError as e:
+            log.error(f"[RTHM] SSL cert verification failed: {e}")
+            log.error("[RTHM] Try setting a permissive SSL context or check hosts file")
+            return False
         except Exception as e:
             log.error(f"[RTHM] Connection failed: {e}")
+            log.error("[RTHM] Check RITHMIC_URL, RITHMIC_SYSTEM, and credentials")
             return False
 
     async def disconnect_rithmic(self):

@@ -99,6 +99,7 @@ class RithmicDataBridge:
         self.tick_queue = asyncio.Queue()
 
     async def start(self):
+        import ssl
         from async_rithmic import RithmicClient
 
         if not RITHMIC_USER or not RITHMIC_PASSWORD:
@@ -114,12 +115,18 @@ class RithmicDataBridge:
             url=RITHMIC_URL,
         )
 
+        # Override SSL to be permissive (hosts file redirects to localhost)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        self.client.ssl_context = ctx
+
         self.client.on_connected += lambda plant: log.info(f"[{plant}] Connected")
         self.client.on_disconnected += lambda plant: log.warning(f"[{plant}] Disconnected")
-
         self.client.on_tick += self._on_tick
 
         try:
+            log.info(f"Connecting to Rithmic: {RITHMIC_URL} (user={RITHMIC_USER}, system={RITHMIC_SYSTEM})")
             await self.client.connect()
             log.info("Connected to Rithmic")
 
@@ -133,6 +140,8 @@ class RithmicDataBridge:
             while self.running:
                 await asyncio.sleep(1)
 
+        except ssl.SSLCertVerificationError as e:
+            log.error(f"SSL error: {e}")
         except Exception as e:
             log.exception(f"Connection error: {e}")
         finally:
