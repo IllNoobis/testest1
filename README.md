@@ -1,5 +1,5 @@
-### YES I HAVE GOTTEN AI TO GENERATE AN ENTIRE README FILE but b4 tht for all my fellow humans that are not geeked out nerds:
-deep chart cra**ed : Not the latest version (STILL HAS ALL MAJOR INDICATORS/FEATURES!)
+
+deep chart : Not the latest version (STILL HAS ALL MAJOR INDICATORS/FEATURES!)
 
 Lemme explain;
 basically the `bridge_mitm_proxy.py` file connects the data feed (makes your demo AMP / CQG guys) think this is the real version.
