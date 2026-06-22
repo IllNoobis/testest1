@@ -1,0 +1,7 @@
+*.pyc
+**/__pycache__/
+logs/
+*.log
+.env
+config_local.py
+*.zip
