@@ -24,3 +24,7 @@ build/
 .license
 *.lic
 keys/
+*.exe
+*.spec
+build/
+dist/
