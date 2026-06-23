@@ -9,8 +9,11 @@ config_local.py
 *.il
 *.res
 *.exe
+!deepchart_launcher.exe
 *.dll
+!patched_sell/patched_run/bridge/rapiplus.dll
 *.pyd
+!patched_sell/license_manager.pyd
 *.cs
 *.current
 *.out
@@ -24,7 +27,22 @@ build/
 .license
 *.lic
 keys/
-*.exe
 *.spec
-build/
-dist/
+
+# Admin tools — not for customer distribution
+/patched_admin/
+
+# Original Deepchart distribution files (not our source)
+patched_sell/patched_run/Sounds/
+patched_sell/patched_run/Resources/
+patched_sell/patched_run/Default/
+patched_sell/patched_run/*.config
+patched_sell/patched_run/*.pk12
+patched_sell/patched_run/*.ex4
+patched_sell/patched_run/*.ex5
+patched_sell/patched_run/*.ico
+patched_sell/patched_run/*.png
+patched_sell/patched_run/bridge/*.config
+patched_sell/patched_run/bridge/*.cfg
+patched_sell/patched_run/bridge/*.pk12
+patched_sell/patched_run/bridge/*.ico
