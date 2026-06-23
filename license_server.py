@@ -12,6 +12,7 @@ import sqlite3
 import secrets
 import hashlib
 import hmac
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -26,7 +27,14 @@ except ImportError:
 DB_PATH = Path(__file__).parent / "licenses.db"
 SECRET_KEY = "change-this-to-a-random-secret"  # CHANGE ME
 
-app = FastAPI(title="License Server", version="1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _init_db()
+    yield
+
+
+app = FastAPI(title="License Server", version="1.0", lifespan=lifespan)
 
 
 def _init_db():
@@ -81,11 +89,6 @@ class RegisterResponse(BaseModel):
     success: bool
     message: str = ""
     expires_at: str = ""
-
-
-@app.on_event("startup")
-def startup():
-    _init_db()
 
 
 @app.get("/")
