@@ -1,17 +1,17 @@
 {
-    "_comment": "Bridge Configuration — edit this file to set your data source and credentials.",
-    "_comment_data_source": "'rithmic' or 'cqg'. CQG uses the free AMP demo by default, no account needed.",
-    "data_source": "rithmic",
+    "_comment": "Deepchart Bridge Configuration",
+    "_comment_data_source": "'rithmic' or 'cqg'. CQG uses the free AMP demo by default.",
+    "data_source": "cqg",
 
     "rithmic": {
-        "_comment_user": "Your Rithmic trial username (email)",
-        "user": "zsfxr34497@minitts.net",
-        "_comment_password": "Your Rithmic trial password",
-        "password": "12345678@@A",
-        "_comment_system": "System name — Rithmic Paper Trading Chicago",
+        "_comment_user": "Your Rithmic username (email from your broker)",
+        "user": "",
+        "_comment_password": "Your Rithmic password",
+        "password": "",
+        "_comment_system": "Rithmic Paper Trading Chicago (or your broker's system)",
         "system": "Rithmic Paper Trading Chicago",
-        "_comment_url": "Gateway URL — rituz00100.rithmic.com:443 for test",
-        "url": "rituz00100.rithmic.com:443"
+        "_comment_url": "Gateway URL from your broker",
+        "url": ""
     },
 
     "cqg": {
@@ -21,20 +21,21 @@
         "password": "AMPDemo1"
     },
 
+    "dxfeed": {
+        "_comment": "DXFeed requires your own account. Configure in Deepchart UI: Data Sources → Add → DXFeed. Enter your credentials there. There is no free/delayed endpoint available."
+    },
+
     "license": {
-        "_comment_server_url": "Your license server URL. Leave empty to skip license check.",
-        "server_url": "http://localhost:9876"
+        "_comment_server_url": "Your license server URL from Deepchart. Leave empty to skip.",
+        "server_url": "http://178.78.236.250:9876"
     },
 
     "bridge": {
-        "_comment_port": "Port the bridge listens on (default 443)",
         "port": 443,
-        "_comment_bind_host": "Interface to bind (0.0.0.0 = all)",
         "bind_host": "0.0.0.0"
     },
 
     "cqg_server_override": {
-        "_comment": "Only needed if CQG changes their server. Leave as-is.",
         "host": "208.48.16.22",
         "port": 443,
         "sni": "demoapi.cqg.com"
