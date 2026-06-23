@@ -26,8 +26,7 @@
     },
 
     "license": {
-        "_comment_server_url": "Your license server URL from Deepchart. Leave empty to skip.",
-        "server_url": "http://178.78.236.250:9876"
+        "_comment": "Offline license system. Place a .lic file in the Deepchart folder to activate."
     },
 
     "bridge": {

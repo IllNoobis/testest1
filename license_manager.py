@@ -1,11 +1,9 @@
 """
-license_manager.py — Client-side license validation for the bridge.
-HWID generation, server validation, periodic check-ins.
-
+license_manager.py — Offline RSA-signed license verification.
+Public key is baked in. No server required.
 Can be compiled to .pyd with Cython for tamper resistance.
-See compile_license.py in this directory.
 """
-
+import base64
 import hashlib
 import json
 import os
@@ -18,20 +16,29 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    import requests
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+    _HAS_CRYPTO = True
 except ImportError:
-    requests = None  # Will fail gracefully with a message
+    _HAS_CRYPTO = False
+
+# ── RSA Public Key (baked in at compile time) ──────────────────────────
+_PUBLIC_KEY_PEM = """-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvkY6CgJm48Pa4gYdBvPm
+k/HC5mF4fTvPa2wjTRsSRxhwETp0OefuY6LYYSEZF1fXRsPciaeu77Xqq56baZQK
+mkphnWfJREvyYCAi2tuefraksl9bqZ35Nnfrx0FgERd/8UzvD5/vzprQEeYc0zWK
++hhjoHHuxh+WNia44mXevmfnab4ZzwzeLRxKaiKIKP82Ag0tT+H6K0tmlJuQBgOP
+XiWSks/m/bZSpjaGkdt0LUaEb13VhfD0XdmyH2YXBtt5MJ6n2M4o3Isr1aYWORUN
+3YEzrQn4bPzP9V9FdQgdzCAk6V3EUbtPKA2IVOI4dzBbZnHpQnT7DNxVM5yYnDJ9
+5QIDAQAB
+-----END PUBLIC KEY-----"""
 
 LICENSE_FILE = Path(__file__).parent / ".license"
-SERVER_URL = os.environ.get("LICENSE_SERVER_URL", "http://178.78.236.250:9876")
-
-CHECK_INTERVAL = 3600  # Re-check every hour while bridge runs
+LIC_FILES_GLOB = "*.lic"
 
 
 def get_hwid() -> str:
-    """Generate a unique machine identifier."""
     parts = []
-    # Motherboard serial (Windows)
     try:
         out = subprocess.check_output(
             "wmic baseboard get serialnumber", shell=True, stderr=subprocess.DEVNULL
@@ -40,7 +47,6 @@ def get_hwid() -> str:
             parts.append(out)
     except Exception:
         pass
-    # Disk serial
     try:
         out = subprocess.check_output(
             "wmic diskdrive get serialnumber", shell=True, stderr=subprocess.DEVNULL
@@ -49,15 +55,12 @@ def get_hwid() -> str:
             parts.append(out)
     except Exception:
         pass
-    # MAC address
     try:
-        import hashlib as h
         mac = uuid.getnode()
         if mac:
             parts.append(f"{mac:012x}")
     except Exception:
         pass
-    # Fallback: hostname + python path
     if not parts:
         parts.append(platform.node())
         parts.append(sys.prefix)
@@ -70,25 +73,25 @@ class LicenseError(Exception):
 
 
 class LicenseManager:
-    def __init__(self, server_url: str = None):
-        self.server_url = (server_url or SERVER_URL).rstrip("/")
+    def __init__(self):
         self.hwid = get_hwid()
-        self._last_check = 0
-        self._valid = False
-        self._expires_at = ""
-        self._days_remaining = 0
+        self._public_key = None
+
+    def _load_public_key(self):
+        if self._public_key is None:
+            if not _HAS_CRYPTO:
+                raise LicenseError("cryptography library required: pip install cryptography")
+            self._public_key = serialization.load_pem_public_key(_PUBLIC_KEY_PEM.encode())
 
     @property
     def is_activated(self) -> bool:
-        """Check if a license file exists locally."""
         return LICENSE_FILE.exists()
 
     def _load_local(self) -> dict:
         if not LICENSE_FILE.exists():
             return {}
         try:
-            data = json.loads(LICENSE_FILE.read_text())
-            return data
+            return json.loads(LICENSE_FILE.read_text())
         except Exception:
             return {}
 
@@ -96,46 +99,60 @@ class LicenseManager:
         LICENSE_FILE.write_text(json.dumps(data, indent=2))
 
     def get_hwid_display(self) -> str:
-        """Show HWID in chunks for easy reading."""
         h = self.hwid
         return "-".join(h[i:i+4] for i in range(0, len(h), 4))
 
-    def activate(self, license_key: str) -> dict:
-        """Activate a license key against the server."""
-        if not requests:
-            raise LicenseError("requests library required: pip install requests")
+    def find_license_files(self) -> list:
+        folder = Path(__file__).parent
+        return sorted(folder.glob(LIC_FILES_GLOB))
+
+    def activate_from_file(self, lic_path: str | Path) -> dict:
+        lic_path = Path(lic_path)
         try:
-            resp = requests.post(
-                f"{self.server_url}/register",
-                json={"license_key": license_key.strip().upper(), "hwid": self.hwid},
-                timeout=10,
-            )
-            data = resp.json()
-            if data.get("success"):
-                self._save_local({
-                    "license_key": license_key.strip().upper(),
-                    "hwid": self.hwid,
-                    "expires_at": data["expires_at"],
-                    "activated_at": datetime.now(timezone.utc).isoformat(),
-                })
-                self._valid = True
-                self._expires_at = data["expires_at"]
-            return data
-        except requests.exceptions.ConnectionError:
-            raise LicenseError(f"Cannot reach license server: {self.server_url}")
+            data = json.loads(lic_path.read_text(encoding="utf-8"))
         except Exception as e:
-            raise LicenseError(f"Activation failed: {e}")
+            raise LicenseError(f"Cannot read license file: {e}")
+
+        signature_b64 = data.pop("signature", "")
+        if not signature_b64:
+            raise LicenseError("No signature in license file")
+
+        self._load_public_key()
+        payload = json.dumps(data, separators=(",", ":"), sort_keys=True)
+        try:
+            signature = base64.b64decode(signature_b64)
+            self._public_key.verify(signature, payload.encode(), padding.PKCS1v15(), hashes.SHA256())
+        except Exception:
+            raise LicenseError("License signature invalid — file has been tampered with")
+
+        # Check expiry
+        expires_str = data.get("expires_at", "")
+        if expires_str:
+            expires = datetime.fromisoformat(expires_str)
+            if expires < datetime.now(timezone.utc):
+                raise LicenseError("License has expired")
+
+        # Check HWID if bound
+        lic_hwid = data.get("hwid", "").strip()
+        if lic_hwid and lic_hwid.upper() != self.hwid:
+            raise LicenseError(f"License is bound to another machine (HWID: {lic_hwid})")
+
+        # Save to .license
+        self._save_local({
+            "license_key": data.get("license_key", ""),
+            "hwid": self.hwid,
+            "expires_at": expires_str,
+            "customer": data.get("customer", ""),
+            "activated_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+        return data
 
     def validate(self) -> tuple:
-        """
-        Returns (is_valid: bool, days_remaining: int, message: str).
-        First checks local cache, then phones home periodically.
-        """
         local = self._load_local()
         if not local:
             return False, 0, "Not activated"
 
-        # Always check expiration from local data first
         expires_str = local.get("expires_at", "")
         if expires_str:
             try:
@@ -143,52 +160,15 @@ class LicenseManager:
                 remaining = (expires - datetime.now(timezone.utc)).days
                 if expires < datetime.now(timezone.utc):
                     return False, 0, "License expired"
+                return True, max(0, remaining), "Valid"
             except Exception:
                 pass
 
-        # Phone home periodically
-        now = time.time()
-        if now - self._last_check > CHECK_INTERVAL:
-            self._last_check = now
-            if requests:
-                try:
-                    resp = requests.post(
-                        f"{self.server_url}/validate",
-                        json={"license_key": local.get("license_key", ""), "hwid": self.hwid},
-                        timeout=10,
-                    )
-                    data = resp.json()
-                    if data.get("valid"):
-                        self._valid = True
-                        self._expires_at = data.get("expires_at", expires_str)
-                        self._days_remaining = data.get("days_remaining", 0)
-                        return True, self._days_remaining, "Valid"
-                    else:
-                        return False, 0, data.get("message", "Server rejected license")
-                except requests.exceptions.ConnectionError:
-                    # Server unreachable - use local cache
-                    pass
-                except Exception:
-                    pass
-
-        # Fallback: use cached data
-        if expires_str:
-            try:
-                expires = datetime.fromisoformat(expires_str)
-                remaining = (expires - datetime.now(timezone.utc)).days
-                if remaining >= 0:
-                    return True, remaining, "Valid (cached)"
-                return False, 0, "License expired"
-            except Exception:
-                pass
-
-        return True, 30, "Could not verify (offline mode)"
+        return False, 0, "Invalid license data"
 
     def deactivate_local(self):
-        """Remove local license file."""
         if LICENSE_FILE.exists():
             LICENSE_FILE.unlink()
-        self._valid = False
 
 
 if __name__ == "__main__":
@@ -197,28 +177,33 @@ if __name__ == "__main__":
 
     if action == "hwid":
         print(f"HWID: {lm.get_hwid_display()}")
-    elif action == "activate":
-        if len(sys.argv) < 3:
-            print("Usage: python license_manager.py activate LICENSE-KEY")
-            sys.exit(1)
-        key = sys.argv[2]
-        try:
-            result = lm.activate(key)
-            if result.get("success"):
-                print(f"[+] Activated! Expires: {result.get('expires_at', 'unknown')}")
-            else:
-                print(f"[-] Failed: {result.get('message', 'Unknown error')}")
-        except LicenseError as e:
-            print(f"[-] {e}")
     elif action == "status":
         valid, days, msg = lm.validate()
         if valid:
-            print(f"[+] License valid. {days} days remaining. ({msg})")
+            print(f"[LICENSE] Valid — {days} days remaining ({msg})")
         else:
-            print(f"[-] License invalid: {msg}")
+            print(f"[LICENSE] {msg}")
         print(f"    HWID: {lm.get_hwid_display()}")
+    elif action == "activate":
+        lic_files = lm.find_license_files()
+        if not lic_files:
+            print("[LICENSE] No .lic files found in this folder")
+            print("[LICENSE] Place a .lic file in the folder or contact your reseller")
+            sys.exit(1)
+        for f in lic_files:
+            print(f"[LICENSE] Found: {f.name}")
+            try:
+                result = lm.activate_from_file(f)
+                print(f"[LICENSE] Activated! Expires: {result.get('expires_at', 'unknown')}")
+                print(f"[LICENSE] Customer: {result.get('customer', '')}")
+                # Remove the .lic file after successful activation
+                f.unlink()
+                sys.exit(0)
+            except LicenseError as e:
+                print(f"[LICENSE] Failed: {e}")
+                sys.exit(1)
     elif action == "deactivate":
         lm.deactivate_local()
-        print("[-] Local license removed")
+        print("[LICENSE] Local license removed")
     else:
-        print("Usage: python license_manager.py [hwid|activate|status|deactivate]")
+        print("Usage: python license_manager.py [hwid|status|activate|deactivate]")

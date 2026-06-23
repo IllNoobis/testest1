@@ -21,3 +21,6 @@ licenses.db
 dist/
 build/
 *.egg-info/
+.license
+*.lic
+keys/

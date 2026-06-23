@@ -1025,24 +1025,19 @@ async def handle(client_r, client_w):
     log.info(f"[-] Disconnected {peer}")
 
 
-# ─── License check ──────────────────────────────────────────────────────────────
+# ─── License check (offline) ──────────────────────────────────────────────────
 def _check_license() -> bool:
-    LICENSE_SERVER_URL = os.environ.get("LICENSE_SERVER_URL", "")
-    if not LICENSE_SERVER_URL:
-        return True
     try:
         from license_manager import LicenseManager
-        lm = LicenseManager(LICENSE_SERVER_URL)
+        lm = LicenseManager()
         valid, days, msg = lm.validate()
         if not valid and not lm.is_activated:
             log.error("=" * 60)
             log.error("[!] LICENSE NOT ACTIVATED")
             log.error(f"[!] HWID: {lm.get_hwid_display()}")
-            log.error(f"[!] Set LICENSE_SERVER_URL env var to your server")
-            log.error(f"[!] Or activate: py license_check.py --activate YOUR-KEY")
+            log.error(f"[!] Place a .lic file in the Deepchart folder")
             log.error("=" * 60)
             log.error("[*] Bridge will NOT start without a valid license.")
-            log.error("[*] To skip license check, unset LICENSE_SERVER_URL.")
             return False
         elif not valid:
             log.error(f"[!] License invalid: {msg}")
@@ -1050,7 +1045,7 @@ def _check_license() -> bool:
         log.info(f"[+] License valid ({days} days remaining)")
         return True
     except ImportError:
-        log.error("[!] LICENSE_SERVER_URL set but license_manager module not found")
+        log.error("[!] license_manager module not found")
         return False
     except Exception as e:
         log.error(f"[!] License check failed: {e}")

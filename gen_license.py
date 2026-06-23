@@ -1,15 +1,17 @@
 """
-gen_license.py — Generate license keys for your customers.
+gen_license.py — Generate license keys and signed .lic files for customers.
 
 Usage:
   python gen_license.py --days 30 "CustomerName — notes"
   python gen_license.py --days 365 --hwid ABC123 "CustomerName"
+  python gen_license.py --lic --days 30 --hwid ABC123 "CustomerName"
   python gen_license.py --list
   python gen_license.py --deactivate LICENSE-KEY
   python gen_license.py --reactivate LICENSE-KEY
   python gen_license.py --edit-note LICENSE-KEY "New note text"
 """
-
+import base64
+import json
 import sqlite3
 import secrets
 import sys
@@ -17,6 +19,16 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "licenses.db"
+KEYS_DIR = Path(__file__).parent / "keys"
+
+
+def _load_private_key():
+    from cryptography.hazmat.primitives import serialization
+    key_path = KEYS_DIR / "private.pem"
+    if not key_path.exists():
+        print("[!] No private key found. Generate one first with: python gen_keys.py")
+        sys.exit(1)
+    return serialization.load_pem_private_key(key_path.read_bytes(), password=None)
 
 
 def _init_db():
@@ -64,6 +76,37 @@ def create_license(days: int, note: str = "", hwid: str = ""):
     if hwid:
         print(f"    Pre-bound HWID: {hwid}")
     return key
+
+
+def sign_lic_file(key: str, days: int, note: str = "", hwid: str = ""):
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import padding
+
+    private_key = _load_private_key()
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(days=days)
+
+    lic_data = {
+        "license_key": key,
+        "hwid": hwid,
+        "customer": note,
+        "created_at": now.isoformat(),
+        "expires_at": expires.isoformat(),
+    }
+
+    payload = json.dumps(lic_data, separators=(",", ":"), sort_keys=True)
+    signature = private_key.sign(payload.encode(), padding.PKCS1v15(), hashes.SHA256())
+    lic_data["signature"] = base64.b64encode(signature).decode()
+
+    lic_path = Path.cwd() / f"{key}.lic"
+    lic_path.write_text(json.dumps(lic_data, indent=2), encoding="utf-8")
+    print(f"[+] Signed .lic file: {lic_path}")
+    print(f"    Expires: {expires.isoformat()} ({days} days)")
+    print(f"    Customer: {note}")
+    if hwid:
+        print(f"    Pre-bound HWID: {hwid}")
+    print(f"    Send this file to the customer.")
+    return lic_path
 
 
 def list_licenses():
@@ -146,6 +189,29 @@ if __name__ == "__main__":
             update_note(sys.argv[idx], sys.argv[idx + 1])
         else:
             print("Usage: python gen_license.py --edit-note LICENSE-KEY 'New note'")
+    elif "--lic" in sys.argv and "--days" in sys.argv:
+        didx = sys.argv.index("--days") + 1
+        days = int(sys.argv[didx]) if didx < len(sys.argv) else 30
+        hwid = ""
+        note = ""
+        if "--hwid" in sys.argv:
+            hidx = sys.argv.index("--hwid") + 1
+            if hidx < len(sys.argv):
+                hwid = sys.argv[hidx].strip()
+        key = _generate()
+        params = []
+        skip = False
+        for a in sys.argv[1:]:
+            if skip:
+                skip = False
+                continue
+            if a == "--lic" or a == "--days" or a == "--hwid":
+                skip = a in ("--days", "--hwid")
+            elif not a.startswith("--"):
+                params.append(a)
+        note = " ".join(params)
+        create_license(days, note, hwid)
+        sign_lic_file(key, days, note, hwid)
     elif "--days" in sys.argv:
         idx = sys.argv.index("--days") + 1
         days = int(sys.argv[idx]) if idx < len(sys.argv) else 30
@@ -155,7 +221,6 @@ if __name__ == "__main__":
             hidx = sys.argv.index("--hwid") + 1
             if hidx < len(sys.argv):
                 hwid = sys.argv[hidx].strip()
-        # Everything after the flags is the customer note
         args = [a for a in sys.argv[1:] if not a.startswith("--")]
         if args:
             params = []
@@ -176,6 +241,7 @@ if __name__ == "__main__":
         print("Usage:")
         print("  python gen_license.py --days 30 'CustomerName — notes'")
         print("  python gen_license.py --days 365 --hwid ABC123 'CustomerName'")
+        print("  python gen_license.py --lic --days 30 --hwid ABC123 'Customer'")
         print("  python gen_license.py --list")
         print("  python gen_license.py --deactivate LICENSE-KEY")
         print("  python gen_license.py --reactivate LICENSE-KEY")
