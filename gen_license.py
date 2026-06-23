@@ -98,7 +98,7 @@ def sign_lic_file(key: str, days: int, note: str = "", hwid: str = ""):
     signature = private_key.sign(payload.encode(), padding.PKCS1v15(), hashes.SHA256())
     lic_data["signature"] = base64.b64encode(signature).decode()
 
-    lic_path = Path.cwd() / f"{key}.lic"
+    lic_path = Path(__file__).parent / f"{key}.lic"
     lic_path.write_text(json.dumps(lic_data, indent=2), encoding="utf-8")
     print(f"[+] Signed .lic file: {lic_path}")
     print(f"    Expires: {expires.isoformat()} ({days} days)")
