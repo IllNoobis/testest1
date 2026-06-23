@@ -2,10 +2,12 @@
 gen_license.py — Generate license keys for your customers.
 
 Usage:
-  python gen_license.py --days 30 "CustomerName"
+  python gen_license.py --days 30 "CustomerName — notes"
   python gen_license.py --days 365 --hwid ABC123 "CustomerName"
   python gen_license.py --list
   python gen_license.py --deactivate LICENSE-KEY
+  python gen_license.py --reactivate LICENSE-KEY
+  python gen_license.py --edit-note LICENSE-KEY "New note text"
 """
 
 import sqlite3
@@ -95,6 +97,33 @@ def deactivate(key: str):
         print(f"[!] License not found: {key}")
 
 
+def reactivate(key: str):
+    _init_db()
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("UPDATE licenses SET active = 1 WHERE license_key = ?", (key.strip().upper(),))
+    conn.commit()
+    affected = conn.total_changes
+    conn.close()
+    if affected:
+        print(f"[+] Reactivated: {key}")
+    else:
+        print(f"[!] License not found: {key}")
+
+
+def update_note(key: str, note: str):
+    _init_db()
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("UPDATE licenses SET note = ? WHERE license_key = ?", (note, key.strip().upper()))
+    conn.commit()
+    affected = conn.total_changes
+    conn.close()
+    if affected:
+        print(f"[+] Note updated for: {key}")
+        print(f"    Note: {note}")
+    else:
+        print(f"[!] License not found: {key}")
+
+
 if __name__ == "__main__":
     _init_db()
     if "--list" in sys.argv:
@@ -105,6 +134,18 @@ if __name__ == "__main__":
             deactivate(sys.argv[idx])
         else:
             print("Usage: python gen_license.py --deactivate LICENSE-KEY")
+    elif "--reactivate" in sys.argv:
+        idx = sys.argv.index("--reactivate") + 1
+        if idx < len(sys.argv):
+            reactivate(sys.argv[idx])
+        else:
+            print("Usage: python gen_license.py --reactivate LICENSE-KEY")
+    elif "--edit-note" in sys.argv:
+        idx = sys.argv.index("--edit-note") + 1
+        if idx + 1 < len(sys.argv):
+            update_note(sys.argv[idx], sys.argv[idx + 1])
+        else:
+            print("Usage: python gen_license.py --edit-note LICENSE-KEY 'New note'")
     elif "--days" in sys.argv:
         idx = sys.argv.index("--days") + 1
         days = int(sys.argv[idx]) if idx < len(sys.argv) else 30
@@ -133,7 +174,9 @@ if __name__ == "__main__":
         create_license(days, note, hwid)
     else:
         print("Usage:")
-        print("  python gen_license.py --days 30 'CustomerName'")
+        print("  python gen_license.py --days 30 'CustomerName — notes'")
         print("  python gen_license.py --days 365 --hwid ABC123 'CustomerName'")
         print("  python gen_license.py --list")
         print("  python gen_license.py --deactivate LICENSE-KEY")
+        print("  python gen_license.py --reactivate LICENSE-KEY")
+        print("  python gen_license.py --edit-note LICENSE-KEY 'New note'")
