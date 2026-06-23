@@ -16,7 +16,7 @@ from tkinter import ttk, messagebox, scrolledtext
 sys.path.insert(0, str(Path(__file__).parent))
 from gen_license import (
     create_license, list_licenses, deactivate,
-    reactivate, update_note, sign_lic_file, _generate,
+    reactivate, update_note, delete_license, sign_lic_file, _generate,
 )
 
 try:
@@ -162,6 +162,9 @@ class ListTab(Frame):
         Button(bf, text="Reactivate Selected", bg=SUCCESS, fg=BG,
                relief=FLAT, padx=12, cursor="hand2",
                command=self._reactivate).pack(side=LEFT, padx=4)
+        Button(bf, text="Delete Selected", bg=ERROR, fg=BG,
+               relief=FLAT, padx=12, cursor="hand2",
+               command=self._delete).pack(side=LEFT, padx=4)
         Button(bf, text="Edit Note", bg=WARN, fg=BG,
                relief=FLAT, padx=12, cursor="hand2",
                command=self._edit_note).pack(side=LEFT, padx=4)
@@ -194,7 +197,6 @@ class ListTab(Frame):
     def _selected_key(self):
         sel = self.tree.selection()
         if not sel:
-            messagebox.showwarning("No selection", "Select a license first")
             return None
         return self.tree.item(sel[0], "values")[0]
 
@@ -208,6 +210,12 @@ class ListTab(Frame):
         key = self._selected_key()
         if key:
             reactivate(key)
+            self._refresh()
+
+    def _delete(self):
+        key = self._selected_key()
+        if key:
+            delete_license(key)
             self._refresh()
 
     def _edit_note(self):

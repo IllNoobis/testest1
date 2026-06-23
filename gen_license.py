@@ -167,6 +167,19 @@ def update_note(key: str, note: str):
         print(f"[!] License not found: {key}")
 
 
+def delete_license(key: str):
+    _init_db()
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("DELETE FROM licenses WHERE license_key = ?", (key.strip().upper(),))
+    conn.commit()
+    affected = conn.total_changes
+    conn.close()
+    if affected:
+        print(f"[-] Deleted: {key}")
+    else:
+        print(f"[!] License not found: {key}")
+
+
 if __name__ == "__main__":
     _init_db()
     if "--list" in sys.argv:
@@ -183,6 +196,12 @@ if __name__ == "__main__":
             reactivate(sys.argv[idx])
         else:
             print("Usage: python gen_license.py --reactivate LICENSE-KEY")
+    elif "--delete" in sys.argv:
+        idx = sys.argv.index("--delete") + 1
+        if idx < len(sys.argv):
+            delete_license(sys.argv[idx])
+        else:
+            print("Usage: python gen_license.py --delete LICENSE-KEY")
     elif "--edit-note" in sys.argv:
         idx = sys.argv.index("--edit-note") + 1
         if idx + 1 < len(sys.argv):
@@ -245,4 +264,5 @@ if __name__ == "__main__":
         print("  python gen_license.py --list")
         print("  python gen_license.py --deactivate LICENSE-KEY")
         print("  python gen_license.py --reactivate LICENSE-KEY")
+        print("  python gen_license.py --delete LICENSE-KEY")
         print("  python gen_license.py --edit-note LICENSE-KEY 'New note'")
