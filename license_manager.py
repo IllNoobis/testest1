@@ -5,6 +5,7 @@ Can be compiled to .pyd with Cython for tamper resistance.
 """
 import base64
 import hashlib
+import hmac
 import json
 import os
 import platform
@@ -32,6 +33,9 @@ XiWSks/m/bZSpjaGkdt0LUaEb13VhfD0XdmyH2YXBtt5MJ6n2M4o3Isr1aYWORUN
 3YEzrQn4bPzP9V9FdQgdzCAk6V3EUbtPKA2IVOI4dzBbZnHpQnT7DNxVM5yYnDJ9
 5QIDAQAB
 -----END PUBLIC KEY-----"""
+
+# ── HMAC key for .license file integrity (tamper protection) ────────────
+_LICENSE_HMAC_KEY = b"dc-lic-hmac-key-9f8a2b7e4c1d"  # 32 bytes
 
 LICENSE_FILE = Path(__file__).parent / ".license"
 LIC_FILES_GLOB = "*.lic"
@@ -87,15 +91,28 @@ class LicenseManager:
     def is_activated(self) -> bool:
         return LICENSE_FILE.exists()
 
+    @staticmethod
+    def _hmac_fields(data: dict) -> str:
+        to_sign = {k: data[k] for k in ("license_key", "hwid", "expires_at", "activated_at", "last_checked") if k in data}
+        payload = json.dumps(to_sign, separators=(",", ":"), sort_keys=True)
+        return hmac.new(_LICENSE_HMAC_KEY, payload.encode(), hashlib.sha256).hexdigest()
+
     def _load_local(self) -> dict:
         if not LICENSE_FILE.exists():
             return {}
         try:
-            return json.loads(LICENSE_FILE.read_text())
+            data = json.loads(LICENSE_FILE.read_text())
+            sig = data.pop("_hmac", "")
+            if sig:
+                expected = self._hmac_fields(data)
+                if not hmac.compare_digest(expected, sig):
+                    return {}  # Tampered
+            return data
         except Exception:
             return {}
 
     def _save_local(self, data: dict):
+        data["_hmac"] = self._hmac_fields(data)
         LICENSE_FILE.write_text(json.dumps(data, indent=2))
 
     def get_hwid_display(self) -> str:
