@@ -137,13 +137,15 @@ class LicenseManager:
         if lic_hwid and lic_hwid.upper() != self.hwid:
             raise LicenseError(f"License is bound to another machine (HWID: {lic_hwid})")
 
+        now = datetime.now(timezone.utc)
         # Save to .license
         self._save_local({
             "license_key": data.get("license_key", ""),
             "hwid": self.hwid,
             "expires_at": expires_str,
             "customer": data.get("customer", ""),
-            "activated_at": datetime.now(timezone.utc).isoformat(),
+            "activated_at": now.isoformat(),
+            "last_checked": now.isoformat(),
         })
 
         return data
@@ -153,18 +155,35 @@ class LicenseManager:
         if not local:
             return False, 0, "Not activated"
 
+        now = datetime.now(timezone.utc)
         expires_str = local.get("expires_at", "")
-        if expires_str:
+        if not expires_str:
+            return False, 0, "Invalid license data"
+
+        try:
+            expires = datetime.fromisoformat(expires_str)
+        except Exception:
+            return False, 0, "Invalid expiry date"
+
+        # Detect clock rollback
+        last_checked_str = local.get("last_checked", "")
+        if last_checked_str:
             try:
-                expires = datetime.fromisoformat(expires_str)
-                remaining = (expires - datetime.now(timezone.utc)).days
-                if expires < datetime.now(timezone.utc):
-                    return False, 0, "License expired"
-                return True, max(0, remaining), "Valid"
+                last_checked = datetime.fromisoformat(last_checked_str)
+                if now < last_checked:
+                    return False, 0, "System clock was rolled back — license invalidated"
             except Exception:
                 pass
 
-        return False, 0, "Invalid license data"
+        # Track time to prevent replay of old .license files
+        local["last_checked"] = now.isoformat()
+        self._save_local(local)
+
+        if expires < now:
+            return False, 0, "License expired"
+
+        remaining = (expires - now).days
+        return True, max(0, remaining), "Valid"
 
     def deactivate_local(self):
         if LICENSE_FILE.exists():
